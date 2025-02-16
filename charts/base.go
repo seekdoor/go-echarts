@@ -5,17 +5,18 @@ import (
 	"encoding/json"
 	"html/template"
 
-	"github.com/go-echarts/go-echarts/v2/actions"
 	"github.com/go-echarts/go-echarts/v2/datasets"
+	"github.com/go-echarts/go-echarts/v2/event"
 	"github.com/go-echarts/go-echarts/v2/opts"
 	"github.com/go-echarts/go-echarts/v2/render"
+	"github.com/go-echarts/go-echarts/v2/types"
+	"github.com/go-echarts/go-echarts/v2/util"
 )
+
+var defaultConfigurationVisitor ConfigurationVisitor = BaseConfigurationVisitor{}
 
 // GlobalOpts sets the Global options for charts.
 type GlobalOpts func(bc *BaseConfiguration)
-
-// GlobalActions sets the Global actions for charts
-type GlobalActions func(ba *BaseActions)
 
 // BaseConfiguration represents an option set needed by all chart types.
 type BaseConfiguration struct {
@@ -23,12 +24,12 @@ type BaseConfiguration struct {
 	opts.Tooltip      `json:"tooltip"`
 	opts.Toolbox      `json:"toolbox"`
 	opts.Title        `json:"title"`
-	opts.Dataset      `json:"dataset"`
 	opts.Polar        `json:"polar"`
 	opts.AngleAxis    `json:"angleAxis"`
 	opts.RadiusAxis   `json:"radiusAxis"`
 	opts.Brush        `json:"brush"`
 	*opts.AxisPointer `json:"axisPointer"`
+	Calendar          []*opts.Calendar `json:"calendar"`
 
 	render.Renderer        `json:"-"`
 	opts.Initialization    `json:"-"`
@@ -52,11 +53,34 @@ type BaseConfiguration struct {
 	// Colors is the color list of palette.
 	// If no color is set in series, the colors would be adopted sequentially and circularly
 	// from this list as the colors of series.
-	Colors      []string
-	appendColor []string // append customize color to the Colors(reverse order)
+	Colors []string
+
+	// Animation configs
+	// Animation whether enable the animation, default true
+	Animation          types.Bool `json:"animation,omitempty"`
+	AnimationThreshold types.Int  `json:"animationThreshold,omitempty"`
+	// AnimationDuration defined as types.FuncStr for more flexibilities, so are other related options
+	AnimationDuration       types.FuncStr `json:"animationDuration,omitempty"`
+	AnimationEasing         string        `json:"animationEasing,omitempty"`
+	AnimationDelay          types.FuncStr `json:"animationDelay,omitempty"`
+	AnimationDurationUpdate types.FuncStr `json:"animationDurationUpdate,omitempty"`
+	AnimationEasingUpdate   string        `json:"animationEasingUpdate,omitempty"`
+	AnimationDelayUpdate    types.FuncStr `json:"animationDelayUpdate,omitempty"`
+
+	//Progressive specifies the amount of graphic elements that can be rendered within a frame (about 16ms) if "progressive rendering" enabled.
+	//By default, progressive is auto-enabled when data amount is bigger than progressiveThreshold
+	Progressive types.Int `json:"progressive,omitempty"`
+	//ProgressiveThreshold number If current data amount is over the threshold, "progressive rendering" is enabled, default 3000
+	ProgressiveThreshold types.Int `json:"progressiveThreshold,omitempty"`
+
+	// Array of datasets, managed by AddDataset()
+	DatasetList []opts.Dataset `json:"dataset,omitempty"`
 
 	DataZoomList  []opts.DataZoom  `json:"datazoom,omitempty"`
 	VisualMapList []opts.VisualMap `json:"visualmap,omitempty"`
+
+	EventListeners       []event.Listener `json:"-"`
+	configurationVisitor ConfigurationVisitor
 
 	// ParallelAxisList represents the component list which is the coordinate axis for parallel coordinate.
 	ParallelAxisList []opts.ParallelAxis
@@ -73,10 +97,8 @@ type BaseConfiguration struct {
 	GridList []opts.Grid `json:"grid,omitempty"`
 }
 
-// BaseActions represents a dispatchAction set needed by all chart types.
-type BaseActions struct {
-	actions.Type  `json:"type,omitempty"`
-	actions.Areas `json:"areas,omitempty"`
+func (bc *BaseConfiguration) Accept(visitor ConfigurationVisitor) {
+	bc.configurationVisitor = visitor
 }
 
 // JSON wraps all the options to a map so that it could be used in the base template
@@ -93,96 +115,113 @@ func (bc *BaseConfiguration) JSONNotEscaped() template.HTML {
 	buff := bytes.NewBufferString("")
 	enc := json.NewEncoder(buff)
 	enc.SetEscapeHTML(false)
-	enc.Encode(obj)
-
-	return template.HTML(buff.String())
-}
-
-// JSONNotEscapedAction works like method JSON, but it returns a marshaled object whose characters will not be escaped in the template
-func (ba *BaseActions) JSONNotEscapedAction() template.HTML {
-	obj := ba.json()
-	buff := bytes.NewBufferString("")
-	enc := json.NewEncoder(buff)
-	enc.SetEscapeHTML(false)
-	enc.Encode(obj)
+	_ = enc.Encode(obj)
 
 	return template.HTML(buff.String())
 }
 
 func (bc *BaseConfiguration) json() map[string]interface{} {
+	visitor := defaultConfigurationVisitor
+	if bc.configurationVisitor != nil {
+		visitor = bc.configurationVisitor
+	}
+
 	obj := map[string]interface{}{
-		"title":   bc.Title,
-		"legend":  bc.Legend,
-		"tooltip": bc.Tooltip,
-		"series":  bc.MultiSeries,
-		"dataset": bc.Dataset,
+		"title":   visitor.VisitTitleOpt(bc.Title),
+		"legend":  visitor.VisitLegendOpt(bc.Legend),
+		"tooltip": visitor.VisitTooltipOpt(bc.Tooltip),
+		"series":  visitor.VisitSeriesOpt(bc.MultiSeries),
+	}
+
+	if bc.Animation != nil {
+		obj["animation"] = bc.Animation
+	}
+
+	if bc.Progressive != nil {
+		obj["progressive"] = bc.Animation
+
+	}
+
+	if bc.ProgressiveThreshold != nil {
+		obj["progressiveThreshold"] = bc.ProgressiveThreshold
+	}
+
+	// if only one item, use it directly instead of an Array
+	if len(bc.DatasetList) == 1 {
+		obj["dataset"] = visitor.VisitDatasets(bc.DatasetList[0])
+	} else if len(bc.DatasetList) > 1 {
+		obj["dataset"] = visitor.VisitDatasets(bc.DatasetList...)
 	}
 	if bc.AxisPointer != nil {
-		obj["axisPointer"] = bc.AxisPointer
+		obj["axisPointer"] = visitor.VisitAxisPointer(bc.AxisPointer)
 	}
+
 	if bc.hasPolar {
-		obj["polar"] = bc.Polar
-		obj["angleAxis"] = bc.AngleAxis
-		obj["radiusAxis"] = bc.RadiusAxis
+		obj["polar"] = visitor.VisitPolar(bc.Polar)
+		obj["angleAxis"] = visitor.VisitAngleAxis(bc.AngleAxis)
+		obj["radiusAxis"] = visitor.VisitRadiusAxis(bc.RadiusAxis)
 	}
 
 	if bc.hasGeo {
-		obj["geo"] = bc.GeoComponent
+		obj["geo"] = visitor.VisitGeo(bc.GeoComponent)
 	}
 
 	if bc.hasRadar {
-		obj["radar"] = bc.RadarComponent
+		obj["radar"] = visitor.VisitRadar(bc.RadarComponent)
 	}
 
 	if bc.hasParallel {
-		obj["parallel"] = bc.ParallelComponent
-		obj["parallelAxis"] = bc.ParallelAxisList
+		obj["parallel"] = visitor.VisitParallel(bc.ParallelComponent)
+		obj["parallelAxis"] = visitor.VisitParallelAxis(bc.ParallelAxisList)
 	}
 
 	if bc.hasSingleAxis {
-		obj["singleAxis"] = bc.SingleAxis
+		obj["singleAxis"] = visitor.VisitSingleAxis(bc.SingleAxis)
 	}
 
-	if bc.Toolbox.Show {
-		obj["toolbox"] = bc.Toolbox
-	}
+	obj["toolbox"] = visitor.VisitToolbox(bc.Toolbox)
 
 	if len(bc.DataZoomList) > 0 {
-		obj["dataZoom"] = bc.DataZoomList
+		obj["dataZoom"] = visitor.VisitDataZooms(bc.DataZoomList)
 	}
 
 	if len(bc.VisualMapList) > 0 {
-		obj["visualMap"] = bc.VisualMapList
+		obj["visualMap"] = visitor.VisitVisualMaps(bc.VisualMapList)
 	}
 
 	if bc.hasXYAxis {
-		obj["xAxis"] = bc.XAxisList
-		obj["yAxis"] = bc.YAxisList
+		obj["xAxis"] = visitor.VisitXAxis(bc.XAxisList)
+		obj["yAxis"] = visitor.VisitYAxis(bc.YAxisList)
 	}
 
 	if bc.has3DAxis {
-		obj["xAxis3D"] = bc.XAxis3D
-		obj["yAxis3D"] = bc.YAxis3D
-		obj["zAxis3D"] = bc.ZAxis3D
-		obj["grid3D"] = bc.Grid3D
+		obj["xAxis3D"] = visitor.VisitXAxis3D(bc.XAxis3D)
+		obj["yAxis3D"] = visitor.VisitYAxis3D(bc.YAxis3D)
+		obj["zAxis3D"] = visitor.VisitZAxis3D(bc.ZAxis3D)
+		obj["grid3D"] = visitor.VisitGrid3D(bc.Grid3D)
 	}
 
 	if bc.Theme == "white" {
 		obj["color"] = bc.Colors
 	}
 
-	if bc.BackgroundColor != "" {
-		obj["backgroundColor"] = bc.BackgroundColor
+	if bc.Initialization.BackgroundColor != "" {
+		obj["backgroundColor"] = bc.Initialization.BackgroundColor
 	}
 
 	if len(bc.GridList) > 0 {
-		obj["grid"] = bc.GridList
+		obj["grid"] = visitor.VisitGrid(bc.GridList)
 	}
 
 	if bc.hasBrush {
-		obj["brush"] = bc.Brush
+		obj["brush"] = visitor.VisitBrush(bc.Brush)
 	}
 
+	if bc.Calendar != nil {
+		obj["calendar"] = visitor.VisitCalendar(bc.Calendar)
+	}
+
+	visitor.Visit(obj)
 	return obj
 }
 
@@ -191,11 +230,22 @@ func (bc *BaseConfiguration) GetAssets() opts.Assets {
 	return bc.Assets
 }
 
+// AddDataset adds a Dataset to this chart
+func (bc *BaseConfiguration) AddDataset(dataset ...opts.Dataset) {
+	bc.DatasetList = append(bc.DatasetList, dataset...)
+}
+
+// FillDefaultValues fill default values for chart options.
+func (bc *BaseConfiguration) FillDefaultValues() {
+	util.SetDefaultValue(bc)
+}
+
 func (bc *BaseConfiguration) initBaseConfiguration() {
 	bc.initSeriesColors()
 	bc.InitAssets()
 	bc.initXYAxis()
 	bc.Initialization.Validate()
+	bc.FillDefaultValues()
 }
 
 func (bc *BaseConfiguration) initSeriesColors() {
@@ -217,34 +267,6 @@ func (bc *BaseConfiguration) insertSeriesColors(colors []string) {
 func (bc *BaseConfiguration) setBaseGlobalOptions(opts ...GlobalOpts) {
 	for _, opt := range opts {
 		opt(bc)
-	}
-}
-
-func (bc *BaseActions) setBaseGlobalActions(opts ...GlobalActions) {
-	for _, opt := range opts {
-		opt(bc)
-	}
-}
-
-func (ba *BaseActions) json() map[string]interface{} {
-	obj := map[string]interface{}{
-		"type":  ba.Type,
-		"areas": ba.Areas,
-	}
-	return obj
-}
-
-// WithAreas sets the areas of the action
-func WithAreas(act actions.Areas) GlobalActions {
-	return func(ba *BaseActions) {
-		ba.Areas = act
-	}
-}
-
-// WithType sets the type of the action
-func WithType(act actions.Type) GlobalActions {
-	return func(ba *BaseActions) {
-		ba.Type = act
 	}
 }
 
@@ -274,6 +296,8 @@ func WithBrush(opt opts.Brush) GlobalOpts {
 func WithPolarOps(opt opts.Polar) GlobalOpts {
 	return func(bc *BaseConfiguration) {
 		bc.Polar = opt
+		bc.hasPolar = true
+		bc.hasXYAxis = false
 	}
 }
 
@@ -281,6 +305,27 @@ func WithPolarOps(opt opts.Polar) GlobalOpts {
 func WithTitleOpts(opt opts.Title) GlobalOpts {
 	return func(bc *BaseConfiguration) {
 		bc.Title = opt
+	}
+}
+
+// WithAnimation enable or disable the animation.
+func WithAnimation(enable bool) GlobalOpts {
+	return func(bc *BaseConfiguration) {
+		bc.Animation = opts.Bool(enable)
+	}
+}
+
+// WithProgressive allows to set amount of graphic elements rendered in a frame
+func WithProgressive(opt int) GlobalOpts {
+	return func(bc *BaseConfiguration) {
+		bc.Progressive = opts.Int(opt)
+	}
+}
+
+// WithProgressiveThreshold Allows to set treshold for progressive rendering
+func WithProgressiveThreshold(opt int) GlobalOpts {
+	return func(bc *BaseConfiguration) {
+		bc.ProgressiveThreshold = opts.Int(opt)
 	}
 }
 
@@ -309,6 +354,12 @@ func WithTooltipOpts(opt opts.Tooltip) GlobalOpts {
 func WithLegendOpts(opt opts.Legend) GlobalOpts {
 	return func(bc *BaseConfiguration) {
 		bc.Legend = opt
+	}
+}
+
+func WithEventListeners(listeners ...event.Listener) GlobalOpts {
+	return func(bc *BaseConfiguration) {
+		bc.EventListeners = append(bc.EventListeners, listeners...)
 	}
 }
 
@@ -350,9 +401,11 @@ func WithRadarComponentOpts(opt opts.RadarComponent) GlobalOpts {
 func WithGeoComponentOpts(opt opts.GeoComponent) GlobalOpts {
 	return func(bc *BaseConfiguration) {
 		bc.GeoComponent = opt
-		bc.JSAssets.Add("maps/" + datasets.MapFileNames[opt.Map] + ".js")
+		mapFile, preset := datasets.PresetMapFileNames[opt.Map]
+		if preset {
+			bc.JSAssets.Add("maps/" + mapFile + ".js")
+		}
 	}
-
 }
 
 // WithParallelComponentOpts sets the parallel component.

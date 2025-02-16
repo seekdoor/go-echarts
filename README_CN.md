@@ -8,8 +8,8 @@
 </p>
 
 <p align="center">
-    <a href="https://travis-ci.org/go-echarts/go-echarts">
-        <img src="https://travis-ci.org/go-echarts/go-echarts.svg?branch=master" alt="Build Status">
+    <a href="https://github.com/go-echarts/go-echarts/actions/workflows/ci.yml">
+        <img src="https://github.com/go-echarts/go-echarts/actions/workflows/ci.yml/badge.svg" alt="Build Status">
     </a>
     <a href="https://goreportcard.com/report/github.com/go-echarts/go-echarts">
         <img src="https://goreportcard.com/badge/github.com/go-echarts/go-echarts" alt="Go Report Card">
@@ -23,12 +23,18 @@
         <a href="https://pkg.go.dev/github.com/go-echarts/go-echarts/v2">
         <img src="https://godoc.org/github.com/go-echarts/go-echarts?status.svg" alt="GoDoc">
     </a>
+    <a href="https://echarts.apache.org/">
+        <img src="https://img.shields.io/badge/echarts-_v5.4.3-orange" alt="echartsVersion">
+    </a>
 </p>
 
 > 如果一门语言可以用来写爬虫，那么它就需要一个优雅的数据可视化库。 --- by dongdong
 
-在 Golang 这门语言中，目前数据可视化的第三方库还是特别少，[go-echarts](https://github.com/go-echarts/go-echarts) 的开发就是为了填补这部分的空隙。[Apache ECharts](http://echarts.apache.org/) 是非常优秀的可视化图表库，凭借着良好的交互性，精巧的图表设计，得到了众多开发者的认可。也有其他语言为其实现了相应语言版本的接口，如 Python 的 [pyecharts](https://github.com/pyecharts/pyecharts)，go-echarts 也是借鉴了 pyecharts 的一些设计思想。
-
+在 Golang 这门语言中，目前数据可视化的第三方库还是特别少，[go-echarts](https://github.com/go-echarts/go-echarts)
+的开发就是为了填补这部分的空隙。  
+[Apache ECharts](http://echarts.apache.org/) 是非常优秀的可视化图表库，凭借着良好的交互性，精巧的图表设计，得到了众多开发者的认可。
+也有其他语言为其实现了相应语言版本的接口，如 Python 的 [pyecharts](https://github.com/pyecharts/pyecharts)，
+go-echarts 也从 pyecharts 借鉴了一些设计思想。
 
 ### 🔰 安装
 
@@ -51,7 +57,11 @@ require github.com/go-echarts/go-echarts/v2
 
 ### ⏳ 版本
 
-go-echarts 现在有 v1 和 v2 两个大版本，v1 版本的代码位于 v1 分支下，v2 代码位于 master 分支下。两个大版本是不兼容的，且 v1 不会再维护了，所以欢迎使用 v2 版本。
+go-echarts 现在有 v1 和 v2 两个大版本，v1 版本的代码位于 v1 分支下，v2 代码位于 master 分支下。两个大版本是不兼容的，且 v1
+不会再维护了，所以欢迎使用 v2 版本。
+
+特别的，当有一些小的改动时（通常做的部分重构）会先发布rc版本，表示这是一个待发布的新的可能有小改动的版本（非breaking）。
+如果跨rc版本对已有的项目直接升级时，可能需要小调整一下代码。
 
 ### ✨ 特性
 
@@ -63,6 +73,9 @@ go-echarts 现在有 v1 和 v2 两个大版本，v1 版本的代码位于 v1 分
 
 ### 📝 使用
 
+使用`go-echarts`
+可以参考[handbook](https://go-echarts.github.io/go-echarts), [go-echarts/examples](https://github.com/go-echarts/examples)
+和 [GoDocs](https://pkg.go.dev/github.com/go-echarts/go-echarts/v2).  
 仅需要几行核心代码就可画出美观的图表
 
 ```golang
@@ -146,7 +159,7 @@ func httpserver(w http.ResponseWriter, _ *http.Request) {
 	line.SetXAxis([]string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}).
 		AddSeries("Category A", generateLineItems()).
 		AddSeries("Category B", generateLineItems()).
-		SetSeriesOptions(charts.WithLineChartOpts(opts.LineChart{Smooth: true}))
+		SetSeriesOptions(charts.WithLineChartOpts(opts.LineChart{Smooth: opts.Bool(true)}))
 	line.Render(w)
 }
 
@@ -157,7 +170,6 @@ func main() {
 ```
 
 ![image](https://user-images.githubusercontent.com/19553554/98436642-044cb600-2118-11eb-9f35-784948a92cb5.png)
-
 
 ### 🔖 Gallery
 
@@ -188,8 +200,6 @@ func main() {
 <img src="https://user-images.githubusercontent.com/19553554/52349544-c2ce3900-2a61-11e9-82af-28aaaaae0d67.gif" width="33%" alt="overlap"/>
 </div>
 
-了解更多文档的内容请访问 [go-echarts/examples](https://github.com/go-echarts/examples) 以及 [GoDoc](https://pkg.go.dev/github.com/go-echarts/go-echarts/v2)
-
 ### 📃 License
 
-MIT [©chenjiandongx](https://github.com/chenjiandongx)
+MIT [©go-echarts](https://github.com/go-echarts/go-echarts/blob/master/LICENSE)

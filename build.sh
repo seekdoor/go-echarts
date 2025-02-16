@@ -12,6 +12,7 @@ function pre_check() {
 }
 
 function format() {
+    # go install mvdan.cc/gofumpt@latest
     go fmt ./... && ls -d */ | xargs goimports -w
 }
 
@@ -30,7 +31,7 @@ function release() {
 }
 
 function help() {
-    echo "$0 --cmd [format|test|release]"
+    echo "$0 [format|test|release]"
 }
 
 if [ "$1" == "" ]; then

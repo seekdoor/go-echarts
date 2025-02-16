@@ -9,11 +9,10 @@ import (
 // Tree represents a Tree chart.
 type Tree struct {
 	BaseConfiguration
-	BaseActions
 }
 
 // Type returns the chart type.
-func (Tree) Type() string { return types.ChartTree }
+func (*Tree) Type() string { return types.ChartTree }
 
 // NewTree creates a new Tree chart instance.
 func NewTree() *Tree {
@@ -34,12 +33,6 @@ func (c *Tree) AddSeries(name string, data []opts.TreeData, options ...SeriesOpt
 // SetGlobalOptions sets options for the Tree instance.
 func (c *Tree) SetGlobalOptions(options ...GlobalOpts) *Tree {
 	c.BaseConfiguration.setBaseGlobalOptions(options...)
-	return c
-}
-
-// SetDispatchActions sets actions for the Tree instance.
-func (c *Tree) SetDispatchActions(actions ...GlobalActions) *Tree {
-	c.BaseActions.setBaseGlobalActions(actions...)
 	return c
 }
 
