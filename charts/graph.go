@@ -9,11 +9,10 @@ import (
 // Graph represents a graph chart.
 type Graph struct {
 	BaseConfiguration
-	BaseActions
 }
 
 // Type returns the chart type.
-func (Graph) Type() string { return types.ChartGraph }
+func (*Graph) Type() string { return types.ChartGraph }
 
 // NewGraph creates a new graph chart.
 func NewGraph() *Graph {
@@ -34,12 +33,6 @@ func (c *Graph) AddSeries(name string, nodes []opts.GraphNode, links []opts.Grap
 // SetGlobalOptions sets options for the Graph instance.
 func (c *Graph) SetGlobalOptions(options ...GlobalOpts) *Graph {
 	c.BaseConfiguration.setBaseGlobalOptions(options...)
-	return c
-}
-
-// SetDispatchActions sets actions for the Graph instance.
-func (c *Graph) SetDispatchActions(actions ...GlobalActions) *Graph {
-	c.BaseActions.setBaseGlobalActions(actions...)
 	return c
 }
 

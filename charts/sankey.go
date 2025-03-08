@@ -9,11 +9,10 @@ import (
 // Sankey represents a sankey chart.
 type Sankey struct {
 	BaseConfiguration
-	BaseActions
 }
 
 // Type returns the chart type.
-func (Sankey) Type() string { return types.ChartSankey }
+func (*Sankey) Type() string { return types.ChartSankey }
 
 // NewSankey creates a new sankey chart.
 func NewSankey() *Sankey {
@@ -34,12 +33,6 @@ func (c *Sankey) AddSeries(name string, nodes []opts.SankeyNode, links []opts.Sa
 // SetGlobalOptions sets options for the Sankey instance.
 func (c *Sankey) SetGlobalOptions(options ...GlobalOpts) *Sankey {
 	c.BaseConfiguration.setBaseGlobalOptions(options...)
-	return c
-}
-
-// SetDispatchActions sets actions for the Sankey instance.
-func (c *Sankey) SetDispatchActions(actions ...GlobalActions) *Sankey {
-	c.BaseActions.setBaseGlobalActions(actions...)
 	return c
 }
 
